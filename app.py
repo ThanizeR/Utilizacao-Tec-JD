@@ -418,17 +418,34 @@ if uploaded_file:
 
         colunas = colunas_por_tipo[tipo_selecionado]
 
+        # Converte para número, mantém NaN onde for inválido
         for col in colunas:
-            df_filtrado[col] = pd.to_numeric(df_filtrado[col], errors="coerce").fillna(0)
+            df_filtrado[col] = pd.to_numeric(df_filtrado[col], errors="coerce")
 
+        # Calcula médias ignorando NaN
         df_resultado = df_filtrado.groupby("Máquina")[colunas].mean().reset_index()
+
+        # Média por máquina (ignora NaN automaticamente)
         df_resultado["Média (%)"] = df_resultado[colunas].mean(axis=1)
-        df_resultado["Média (%)"] = df_resultado["Média (%)"].apply(lambda x: round(x * 100, 2))
+
+        # Multiplica por 100 para formatar como porcentagem
+        for col in colunas:
+            df_resultado[col] = df_resultado[col] 
+        df_resultado["Média (%)"] = df_resultado["Média (%)"] * 100
+
+        # Arredondamento
+        df_resultado[colunas + ["Média (%)"]] = df_resultado[colunas + ["Média (%)"]].round(2)
+
+        # Ordenação
         df_resultado = df_resultado.sort_values(by="Média (%)", ascending=False)
+
+        # Cálculo da média geral por coluna
+        media_por_coluna = df_filtrado[colunas].mean() * 100
+        media_por_coluna = media_por_coluna.round(2)
 
         media_geral_dict = {
             "Máquina": "Média Geral",
-            **{col: f"{round(df_resultado[col].mean() * 100, 2)}%" for col in colunas},
+            **{col: f"{media_por_coluna[col]}%" for col in colunas},
             "Média (%)": ""
         }
         media_geral = pd.DataFrame([media_geral_dict])
@@ -614,7 +631,8 @@ if uploaded_file:
 
         todas_tecnologias = list(set(sum(colunas_por_tipo.values(), [])))
         for col in todas_tecnologias:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+             df[col] = pd.to_numeric(df[col], errors="coerce")  # mantém NaNs
+
 
         df_qtd = (
             df.groupby(["Organização", "Tipo_Cat"])
