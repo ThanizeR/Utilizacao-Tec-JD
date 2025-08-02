@@ -417,7 +417,7 @@ if uploaded_file:
             st.stop()
 
         colunas = colunas_por_tipo[tipo_selecionado]
-
+####NOVIDADE
         # Converte para número, mantém NaN onde for inválido
         for col in colunas:
             df_filtrado[col] = pd.to_numeric(df_filtrado[col], errors="coerce")
@@ -847,7 +847,7 @@ if uploaded_file:
                     plt.savefig(caminho, dpi=300, bbox_inches='tight', pad_inches=0.3)
                     plt.close()
 
-
+                    ####atualização
                 # 3. Informações para capa
                 total_orgs = df_final.shape[0] - 1 if "TOTAL" in df_final.index else df_final.shape[0]
                 data_inicio = pd.to_datetime(df["Data de Início"], dayfirst=True).min().strftime("%d/%m/%Y")
