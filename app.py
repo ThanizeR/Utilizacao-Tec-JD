@@ -417,45 +417,34 @@ if uploaded_file:
             st.stop()
 
         colunas = colunas_por_tipo[tipo_selecionado]
-####NOVIDADE
-        # Converte para número, mantém NaN onde for inválido
+
         for col in colunas:
             df_filtrado[col] = pd.to_numeric(df_filtrado[col], errors="coerce")
 
-        # Calcula médias ignorando NaN
+
         df_resultado = df_filtrado.groupby("Máquina")[colunas].mean().reset_index()
-
-        # Média por máquina (ignora NaN automaticamente)
-        df_resultado["Média (%)"] = df_resultado[colunas].mean(axis=1)
-
-        # Multiplica por 100 para formatar como porcentagem
-        for col in colunas:
-            df_resultado[col] = df_resultado[col] 
-        df_resultado["Média (%)"] = df_resultado["Média (%)"] * 100
-
-        # Arredondamento
-        df_resultado[colunas + ["Média (%)"]] = df_resultado[colunas + ["Média (%)"]].round(2)
-
-        # Ordenação
+        df_resultado["Média (%)"] = df_resultado[colunas].mean(axis=1) * 100 # média correta, ignora NaN
+        df_resultado["Média (%)"] = df_resultado["Média (%)"].apply(lambda x: round(x, 2))
         df_resultado = df_resultado.sort_values(by="Média (%)", ascending=False)
-
-        # Cálculo da média geral por coluna
-        media_por_coluna = df_filtrado[colunas].mean() * 100
-        media_por_coluna = media_por_coluna.round(2)
 
         media_geral_dict = {
             "Máquina": "Média Geral",
-            **{col: f"{media_por_coluna[col]}%" for col in colunas},
+            **{col: f"{round(df_resultado[col].mean() *100, 2)}%" for col in colunas},
             "Média (%)": ""
         }
+
         media_geral = pd.DataFrame([media_geral_dict])
         df_numerico = df_resultado.copy()
+        df_numerico[colunas] = df_numerico[colunas].fillna(0)  # apenas para exibir
+
         styled_df = pd.concat([df_numerico, media_geral], ignore_index=True)
+
 
         for col in colunas:
             styled_df[col] = styled_df[col].apply(lambda x: f"{x:.4f}" if isinstance(x, (float, int)) else x)
 
         styled_df["Média (%)"] = styled_df["Média (%)"].apply(lambda x: f"{x:.2f}%" if isinstance(x, (float, int)) else x)
+
 
         def color_scale(val):
             try:
@@ -511,8 +500,9 @@ if uploaded_file:
 
             st.pyplot(fig)
                         # 2) Gráficos separados por tecnologia para médias por modelo
-            df_filtrado[colunas_grafico] = df_filtrado[colunas_grafico].apply(pd.to_numeric, errors='coerce').fillna(0)
+            df_filtrado[colunas_grafico] = df_filtrado[colunas_grafico].apply(pd.to_numeric, errors='coerce')
             df_modelo = df_filtrado.groupby("Modelo")[colunas_grafico].mean() * 100
+
 
             for col in colunas_grafico:
                 fig, ax = plt.subplots(figsize=(8, 5))
@@ -631,8 +621,7 @@ if uploaded_file:
 
         todas_tecnologias = list(set(sum(colunas_por_tipo.values(), [])))
         for col in todas_tecnologias:
-             df[col] = pd.to_numeric(df[col], errors="coerce")  # mantém NaNs
-
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
         df_qtd = (
             df.groupby(["Organização", "Tipo_Cat"])
@@ -646,7 +635,7 @@ if uploaded_file:
             df_tipo = df[df["Tipo_Cat"] == tipo]
             medias_por_tipo[tipo] = df_tipo.groupby("Organização")[colunas_por_tipo[tipo]].mean()
 
-        df_medias = pd.concat(medias_por_tipo.values(), axis=1).fillna(0)
+        df_medias = pd.concat(medias_por_tipo.values(), axis=1)
         colunas_renomeadas = [f"{col}_{tipo}" for tipo, cols in colunas_por_tipo.items() for col in cols]
         df_medias.columns = colunas_renomeadas
 
@@ -847,7 +836,7 @@ if uploaded_file:
                     plt.savefig(caminho, dpi=300, bbox_inches='tight', pad_inches=0.3)
                     plt.close()
 
-                    ####atualização
+
                 # 3. Informações para capa
                 total_orgs = df_final.shape[0] - 1 if "TOTAL" in df_final.index else df_final.shape[0]
                 data_inicio = pd.to_datetime(df["Data de Início"], dayfirst=True).min().strftime("%d/%m/%Y")
