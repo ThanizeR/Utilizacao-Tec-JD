@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from datetime import datetime
 import numpy as np
+import matplotlib.ticker as mtick
 
 
 # ==============================
@@ -733,9 +734,10 @@ if uploaded_file:
                 )
 
             ax.set_title(f"{tipo} - Média das Tecnologias\n(Total: {qtd} máquinas)", fontsize=11)
-            ax.set_ylim(0, 1)
+            ax.set_ylim(0, 1.1)  # um pouco acima de 100%
             ax.set_ylabel("Média (%)")
-            ax.tick_params(axis='x', labelsize=8)  # Legenda eixo X menor
+            ax.tick_params(axis='x', labelsize=8)
+            ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 
             #plt.tight_layout()
             st.pyplot(fig)
