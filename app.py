@@ -847,7 +847,7 @@ if uploaded_file:
                     plt.savefig(caminho, dpi=300, bbox_inches='tight', pad_inches=0.3)
                     plt.close()
 
-
+                    ####atualização
                 # 3. Informações para capa
                 total_orgs = df_final.shape[0] - 1 if "TOTAL" in df_final.index else df_final.shape[0]
                 data_inicio = pd.to_datetime(df["Data de Início"], dayfirst=True).min().strftime("%d/%m/%Y")
