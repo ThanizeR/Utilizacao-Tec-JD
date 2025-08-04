@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from datetime import datetime
 import numpy as np
-import matplotlib.ticker as mtick
 
 
 # ==============================
@@ -108,8 +107,7 @@ class PDFConsolidado(PDF):
             (self.w / 2 + 5, 30),
             (self.w / 4 + 5, self.h / 2 + 15),  # Também desceu 5 unidades
         ]
-
-
+        
         tipos = ["Trator", "Pulverizador", "Colheitadeira"]
 
         for i, tipo in enumerate(tipos):
@@ -119,10 +117,6 @@ class PDFConsolidado(PDF):
                 self.set_xy(x, y - 10)
                 self.cell(largura, 10, tipo, align="C")
                 self.image(caminho_grafico, x=x, y=y, w=largura, h=altura)
-
-
-
-
 
 # =====================
 # FUNÇÕES AUXILIARES
@@ -336,6 +330,34 @@ def salvar_tabela_com_matplotlib_cons(df, caminho_imagem):
         transparent=True
     )
     plt.close()
+
+def add_graficos_com_titulo(self, graficos_dict):
+    self.add_page()
+    self.image(self.fundo_paginas, x=0, y=0, w=297, h=210)  # A4 paisagem
+
+    titulos = {
+        "Trator": "Médias das Tecnologias - Trator",
+        "Pulverizador": "Médias das Tecnologias - Pulverizador",
+        "Colheitadeira": "Médias das Tecnologias - Colheitadeira"
+    }
+
+    posicoes = {
+        "Trator": (15, 40),
+        "Pulverizador": (150, 40),
+        "Colheitadeira": (15, 120)
+    }
+
+    tamanho_w, tamanho_h = 120, 70  # Tamanho das imagens no PDF
+
+    for tipo, caminho_imagem in graficos_dict.items():
+        if os.path.exists(caminho_imagem):
+            x, y = posicoes[tipo]
+            self.set_xy(x, y - 8)
+            self.set_font("Arial", "B", 11)
+            self.cell(w=tamanho_w, h=6, txt=titulos[tipo], ln=1, align="C")
+            self.image(caminho_imagem, x=x, y=y, w=tamanho_w, h=tamanho_h)
+        else:
+            print(f"[AVISO] Imagem não encontrada: {caminho_imagem}")
 
 
 def gerar_pdf_completo_cons(
@@ -624,6 +646,7 @@ if uploaded_file:
         for col in todas_tecnologias:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
+        # Agrupamento para quantidade de máquinas por Organização e Tipo_Cat
         df_qtd = (
             df.groupby(["Organização", "Tipo_Cat"])
             .size()
@@ -631,6 +654,7 @@ if uploaded_file:
             .reindex(columns=["Trator", "Pulverizador", "Colheitadeira"], fill_value=0)
         )
 
+        # Médias por tecnologia e tipo por Organização
         medias_por_tipo = {}
         for tipo in ["Trator", "Pulverizador", "Colheitadeira"]:
             df_tipo = df[df["Tipo_Cat"] == tipo]
@@ -645,23 +669,20 @@ if uploaded_file:
         df_final["MÉDIA POR ORGANIZAÇÃO (%)"] = df_final[colunas_renomeadas].mean(axis=1)
         df_final = df_final.sort_values("MÉDIA POR ORGANIZAÇÃO (%)", ascending=False).head(60)
 
-        total_maquinas = df_final[["Trator", "Pulverizador", "Colheitadeira"]].sum()
-        medias_totais = {}
+        # ======= Totais e médias calculados diretamente no DataFrame original para garantir coerência =======
+        total_maquinas = df.groupby("Tipo_Cat").size().reindex(["Trator", "Pulverizador", "Colheitadeira"]).fillna(0)
 
+        medias_totais = {}
         for tipo, cols in colunas_por_tipo.items():
+            df_tipo = df[df["Tipo_Cat"] == tipo]
             for col in cols:
-                col_renomeada = f"{col}_{tipo}"
-                if col_renomeada in df_final.columns:
-                    valores = df_final[col_renomeada]
-                    pesos = df_final[tipo]
-                    valores, pesos = valores.align(pesos, join='inner', axis=0)
-                    media_ponderada = (valores * pesos).sum() / pesos.sum() if pesos.sum() > 0 else 0
-                    medias_totais[col_renomeada] = media_ponderada
+                media_ponderada = df_tipo[col].mean()
+                medias_totais[f"{col}_{tipo}"] = media_ponderada
 
         linha_total = pd.DataFrame([{
-            "Trator": total_maquinas["Trator"],
-            "Pulverizador": total_maquinas["Pulverizador"],
-            "Colheitadeira": total_maquinas["Colheitadeira"],
+            "Trator": total_maquinas.get("Trator", 0),
+            "Pulverizador": total_maquinas.get("Pulverizador", 0),
+            "Colheitadeira": total_maquinas.get("Colheitadeira", 0),
             **medias_totais,
             "MÉDIA POR ORGANIZAÇÃO (%)": ""
         }], index=["TOTAL"])
@@ -703,148 +724,99 @@ if uploaded_file:
         )
 
         st.dataframe(styled, use_container_width=True)
-
-       # --------- GRÁFICOS DE MÉDIAS POR TECNOLOGIA E TIPO --------------
-        for tipo in ["Trator", "Pulverizador", "Colheitadeira"]:
-            if tipo not in df["Tipo_Cat"].unique():
-                continue
-
-            df_tipo = df[df["Tipo_Cat"] == tipo]
-            qtd = df_tipo.shape[0]
-
-            medias = df_tipo[colunas_por_tipo[tipo]].mean()
-
-            # Formata rótulos do eixo X com quebras de linha
-            labels_original = medias.index.str.replace(f"_{tipo}", "")
-            labels_quebrados = [label.replace(" ", "\n") for label in labels_original]
-
-            fig, ax = plt.subplots(figsize=(8, 5))
-            bars = ax.bar(labels_quebrados, medias.values, color="yellow")
-
-            # Porcentagens maiores acima das barras
-            for bar in bars:
-                altura = bar.get_height()
-                ax.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    altura + 0.02,
-                    f"{altura * 100:.0f}%",
-                    ha='center',
-                    fontsize=11,
-                    fontweight='bold'
-                )
-
-            ax.set_title(f"{tipo} - Média das Tecnologias\n(Total: {qtd} máquinas)", fontsize=11)
-            ax.set_ylim(0, 1.1)  # um pouco acima de 100%
-            ax.set_ylabel("Média (%)")
-            ax.tick_params(axis='x', labelsize=8)
-            ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-
-            #plt.tight_layout()
-            st.pyplot(fig)
-            fig.savefig(
-                f"grafico_{tipo.lower()}.png",
-                dpi=300,
-                bbox_inches='tight',
-                pad_inches=0.3  # aumenta a margem ao redor e evita corte de textos
-            )
-
-            plt.close(fig)
-
-        # --- Tudo abaixo aqui deve estar FORA do loop ---
-
-
-        # Caminhos temporários
-        caminho_tabela = "tabela_consolidado.png"
+        # --------- GRÁFICOS DE MÉDIAS POR TECNOLOGIA E TIPO --------------
         grafico_trator = "grafico_trator.png"
         grafico_pulv = "grafico_pulverizador.png"
         grafico_colh = "grafico_colheitadeira.png"
-        caminho_pdf = "relatorio_consolidado.pdf"
 
-        # Fundo da capa e das páginas (use seus próprios arquivos)
+        fig_trator, fig_pulv, fig_colh = None, None, None  # Inicializa fora do loop
+
+        for tipo in ["Trator", "Pulverizador", "Colheitadeira"]:
+            df_tipo = df[df["Tipo_Cat"] == tipo]
+            medias_tecnologias = df_tipo[colunas_por_tipo[tipo]].mean()
+            total_maquinas_tipo = df_tipo.shape[0]
+
+            labels_originais = medias_tecnologias.index.str.replace(f"_{tipo}", "")
+            labels_quebrados = [label.replace(" ", "\n") for label in labels_originais]
+
+            fig, ax = plt.subplots(figsize=(8, 5))
+            bars = ax.bar(labels_quebrados, medias_tecnologias.values, color="yellow")
+
+            for bar in bars:
+                altura = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2, altura + 0.01, f"{altura * 100:.0f}%", ha='center', fontsize=9)
+
+            ax.set_ylim(0, 1.05)
+            ax.set_ylabel("Média (%)")
+            ax.set_title(f"{tipo} - Médias das Tecnologias\nQuantidade de máquinas: {total_maquinas_tipo}")
+            ax.tick_params(axis='x', labelsize=8)
+
+            plt.tight_layout()
+            st.pyplot(fig)
+
+            # Salva os gráficos para uso posterior no PDF
+            if tipo == "Trator":
+                fig_trator = fig
+                fig_trator.savefig(grafico_trator, dpi=300, bbox_inches='tight', pad_inches=0.3)
+            elif tipo == "Pulverizador":
+                fig_pulv = fig
+                fig_pulv.savefig(grafico_pulv, dpi=300, bbox_inches='tight', pad_inches=0.3)
+            elif tipo == "Colheitadeira":
+                fig_colh = fig
+                fig_colh.savefig(grafico_colh, dpi=300, bbox_inches='tight', pad_inches=0.3)
+
+        plt.close()
+
+        # Caminhos e imagens base
+        caminho_tabela = "tabela_consolidado.png"
+        caminho_pdf = "relatorio_consolidado.pdf"
         fundo_capa = "capa_fundo.png"
         fundo_paginas = "fundo_conteudo.png"
 
-        def gerar_pdf_completo_cons(
-            caminho_tabela,
-            graficos_dict,
-            capa_fundo,
-            fundo_paginas,
-            total_orgs,
-            total_tratores,
-            total_pulvs,
-            total_colhs,
-            data_inicio,
-            data_fim,
-            caminho_saida="relatorio_consolidado.pdf"
-        ):
-            pdf = PDFConsolidado(capa_fundo=capa_fundo, fundo_paginas=fundo_paginas)
-
-            pdf.add_capa(
-                total_orgs=total_orgs,
-                total_tratores=total_tratores,
-                total_pulvs=total_pulvs,
-                total_colhs=total_colhs,
-                data_inicio=data_inicio,
-                data_fim=data_fim
-            )
-
-            pdf.add_tabela(caminho_tabela)
-
-            pdf.add_graficos_com_titulo(graficos_dict)
-
-            pdf.output(caminho_saida)
-
-
+        # Botão para gerar PDF
         if st.button("📄 Gerar PDF Consolidado", key="botao_pdf_consolidado"):
 
             with st.spinner("Gerando relatório..."):
 
-                # 1. Salvar imagem da tabela
+                # Salvar imagem da tabela exibida
                 salvar_tabela_com_matplotlib_cons(df_formatado, caminho_tabela)
 
-                # 2. Salvar gráficos individuais (trator, pulverizador, colheitadeira)
-                for tipo, caminho in zip(
-                    ["Trator", "Pulverizador", "Colheitadeira"],
-                    [grafico_trator, grafico_pulv, grafico_colh]
-                ):
-                    cols_tipo = [col for col in df_final.columns if col.endswith(f"_{tipo}")]
-                    medias_tecnologias = df_final.loc[df_final.index != "TOTAL", cols_tipo].mean()
-                    total_maquinas_tipo = int(df_final.loc["TOTAL", tipo]) if "TOTAL" in df_final.index else df_final[tipo].sum()
-
-                    # Aqui aplicamos a quebra de linha para os labels
-                    labels_originais = medias_tecnologias.index.str.replace(f"_{tipo}", "")
-                    labels_quebrados = [label.replace(" ", "\n") for label in labels_originais]
-
-                    fig, ax = plt.subplots(figsize=(8, 5))
-                    bars = ax.bar(labels_quebrados, medias_tecnologias.values, color="yellow")
-
-                    # Valores percentuais acima das barras
-                    for bar in bars:
-                        altura = bar.get_height()
-                        ax.text(
-                            bar.get_x() + bar.get_width() / 2,
-                            altura + 0.01,
-                            f"{altura * 100:.0f}%",
-                            ha='center',
-                            fontsize=9
-                        )
-
-                    ax.set_ylim(0, 1.05)  # espaço extra no topo para texto
-                    ax.set_ylabel("Média (%)")
-                    ax.set_title(f"{tipo} - Médias das Tecnologias\nQuantidade de máquinas: {total_maquinas_tipo}")
-                    ax.tick_params(axis='x', labelsize=8)  # Menor fonte para o eixo X
-
-                    plt.tight_layout()
-                    plt.savefig(caminho, dpi=300, bbox_inches='tight', pad_inches=0.3)
-                    plt.close()
-
-
-                # 3. Informações para capa
+                # Informações do cabeçalho
                 total_orgs = df_final.shape[0] - 1 if "TOTAL" in df_final.index else df_final.shape[0]
+                total_tratores = int(df_final.loc["TOTAL", "Trator"])
+                total_pulvs = int(df_final.loc["TOTAL", "Pulverizador"])
+                total_colhs = int(df_final.loc["TOTAL", "Colheitadeira"])
                 data_inicio = pd.to_datetime(df["Data de Início"], dayfirst=True).min().strftime("%d/%m/%Y")
                 data_fim = pd.to_datetime(df["Data Final"], dayfirst=True).max().strftime("%d/%m/%Y")
 
-                # 4. Gerar PDF
+                # Função de geração do PDF
+                def gerar_pdf_completo_cons(
+                    caminho_tabela,
+                    graficos_dict,
+                    capa_fundo,
+                    fundo_paginas,
+                    total_orgs,
+                    total_tratores,
+                    total_pulvs,
+                    total_colhs,
+                    data_inicio,
+                    data_fim,
+                    caminho_saida="relatorio_consolidado.pdf"
+                ):
+                    pdf = PDFConsolidado(capa_fundo=capa_fundo, fundo_paginas=fundo_paginas)
+                    pdf.add_capa(
+                        total_orgs=total_orgs,
+                        total_tratores=total_tratores,
+                        total_pulvs=total_pulvs,
+                        total_colhs=total_colhs,
+                        data_inicio=data_inicio,
+                        data_fim=data_fim
+                    )
+                    pdf.add_tabela(caminho_tabela)
+                    pdf.add_graficos_com_titulo(graficos_dict)
+                    pdf.output(caminho_saida)
+
+                # Gera o PDF consolidado com os gráficos corretos
                 gerar_pdf_completo_cons(
                     caminho_tabela=caminho_tabela,
                     graficos_dict={
@@ -855,15 +827,15 @@ if uploaded_file:
                     capa_fundo=fundo_capa,
                     fundo_paginas=fundo_paginas,
                     total_orgs=total_orgs,
-                    total_tratores=int(df_final.loc["TOTAL", "Trator"]),
-                    total_pulvs=int(df_final.loc["TOTAL", "Pulverizador"]),
-                    total_colhs=int(df_final.loc["TOTAL", "Colheitadeira"]),
+                    total_tratores=total_tratores,
+                    total_pulvs=total_pulvs,
+                    total_colhs=total_colhs,
                     data_inicio=data_inicio,
                     data_fim=data_fim,
                     caminho_saida=caminho_pdf
                 )
 
-            # 5. Botão de download após gerar o PDF
+            # Botão para baixar PDF
             with open(caminho_pdf, "rb") as f:
                 st.download_button(
                     label="📥 Baixar PDF Consolidado",
