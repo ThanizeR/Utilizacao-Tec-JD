@@ -614,12 +614,18 @@ if uploaded_file:
     if aba == "Consolidado":
         st.subheader("Relatório Consolidado")
 
-        mapa_tipo_geral = {
-            "Tratores Com Tração Em Duas Rodas - 140 Hp E Acima": "Trator",
-            "Tratores Com Tração Em Duas Rodas - 90 Hp Até Abaixo de 140 HP": "Trator",
-            "Colheitadeira": "Colheitadeira",
-            "Pulverizador": "Pulverizador",
-        }
+        # Função robusta para mapear tipos, garantindo pegar todos os tratores
+        def mapear_tipo(tipo_original):
+            if pd.isna(tipo_original):
+                return None
+            if "Tratores Com Tração Em Duas Rodas" in tipo_original:
+                return "Trator"
+            elif "Colheitadeira" in tipo_original:
+                return "Colheitadeira"
+            elif "Pulverizador" in tipo_original:
+                return "Pulverizador"
+            else:
+                return None
 
         colunas_por_tipo = {
             "Trator": [
@@ -639,24 +645,15 @@ if uploaded_file:
             ]
         }
 
-        # Corrigir e padronizar os dados
+        # Preparar dados
         df = df.copy()
-        df["Tipo_Cat"] = df["Tipo"].map(mapa_tipo_geral)
+        df["Tipo_Cat"] = df["Tipo"].apply(mapear_tipo)  # ajuste principal aqui
 
         todas_tecnologias = list(set(sum(colunas_por_tipo.values(), [])))
-
         for col in todas_tecnologias:
-            # 1. Converter para float
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-            # 2. Tratar valores muito pequenos como zero
-            df[col] = df[col].apply(lambda x: 0.0 if pd.notnull(x) and abs(x) < 0.0001 else x)
-
-    # 3. Garantir que valores NaN não atrapalhem a média
-    # (não preencher com zero — apenas deixar NaN para média correta)
-
-
-        # Agrupamento para quantidade de máquinas por Organização e Tipo_Cat
+        # Quantidade de máquinas por Organização e Tipo_Cat
         df_qtd = (
             df.groupby(["Organização", "Tipo_Cat"])
             .size()
@@ -664,67 +661,110 @@ if uploaded_file:
             .reindex(columns=["Trator", "Pulverizador", "Colheitadeira"], fill_value=0)
         )
 
-        # Médias por tecnologia e tipo por Organização
+        # Calcular médias por organização para cada tecnologia, via média das médias por máquina
         medias_por_tipo = {}
-        for tipo in ["Trator", "Pulverizador", "Colheitadeira"]:
-            df_tipo = df[df["Tipo_Cat"] == tipo]
-            medias_por_tipo[tipo] = df_tipo.groupby("Organização")[colunas_por_tipo[tipo]].mean()
+        colunas_renomeadas = []
 
+        for tipo in ["Trator", "Pulverizador", "Colheitadeira"]:
+            df_tipo = df[df["Tipo_Cat"] == tipo].copy()
+            df_tipo["Máquina"] = df_tipo["Máquina"].astype(str)
+
+            # Filtra colunas que existem
+            colunas_existentes = [col for col in colunas_por_tipo[tipo] if col in df_tipo.columns]
+            df_tipo = df_tipo.dropna(how='all', subset=colunas_existentes)
+
+            medias_por_maquina = df_tipo.groupby(["Organização", "Máquina"])[colunas_existentes].mean()
+            medias_por_org = medias_por_maquina.groupby("Organização").mean()
+
+            medias_por_tipo[tipo] = medias_por_org
+
+            # Monta a lista de nomes renomeados para essas colunas existentes
+            colunas_renomeadas += [f"{col}_{tipo}" for col in colunas_existentes]
+
+        # Concatena as médias
         df_medias = pd.concat(medias_por_tipo.values(), axis=1)
-        colunas_renomeadas = [f"{col}_{tipo}" for tipo, cols in colunas_por_tipo.items() for col in cols]
+
+        # Renomeia as colunas do dataframe concatenado
         df_medias.columns = colunas_renomeadas
 
+        # Reconstrói lista colunas_renomeadas apenas com as existentes (precaução)
+        colunas_renomeadas = [col for col in colunas_renomeadas if col in df_medias.columns]
+        df_medias = df_medias[colunas_renomeadas]
+
+        # Combina quantidade de máquinas e médias
         df_final = df_qtd.join(df_medias, how="outer").fillna(0)
 
+        # Média geral por organização (média das colunas médias)
         df_final["MÉDIA POR ORGANIZAÇÃO (%)"] = df_final[colunas_renomeadas].mean(axis=1)
-        df_final = df_final.sort_values("MÉDIA POR ORGANIZAÇÃO (%)", ascending=False).head(60)
 
-        # ======= Totais e médias calculados diretamente no DataFrame original para garantir coerência =======
+        # Ordena top 70
+        df_final = df_final.sort_values("MÉDIA POR ORGANIZAÇÃO (%)", ascending=False).head(70)
+
+        # Linha TOTAL calculada igual ao específico
         total_maquinas = df.groupby("Tipo_Cat").size().reindex(["Trator", "Pulverizador", "Colheitadeira"]).fillna(0)
 
         medias_totais = {}
         for tipo, cols in colunas_por_tipo.items():
-            df_tipo = df[df["Tipo_Cat"] == tipo]
-            for col in cols:
-                media_ponderada = df_tipo[col].mean()
-                medias_totais[f"{col}_{tipo}"] = media_ponderada
+            df_tipo = df[df["Tipo_Cat"] == tipo].copy()
+            df_tipo["Máquina"] = df_tipo["Máquina"].astype(str)
+            colunas_existentes = [col for col in cols if col in df_tipo.columns]
+            medias_maquina = df_tipo.groupby(["Organização", "Máquina"])[colunas_existentes].mean()
+            for col in colunas_existentes:
+                medias_totais[f"{col}_{tipo}"] = medias_maquina[col].mean()
 
         linha_total = pd.DataFrame([{
             "Trator": total_maquinas.get("Trator", 0),
             "Pulverizador": total_maquinas.get("Pulverizador", 0),
             "Colheitadeira": total_maquinas.get("Colheitadeira", 0),
             **medias_totais,
-            "MÉDIA POR ORGANIZAÇÃO (%)": ""
+            "MÉDIA POR ORGANIZAÇÃO (%)": np.nan
         }], index=["TOTAL"])
 
         df_final = pd.concat([df_final, linha_total])
 
+        # Arredonda para evitar notação científica, ignorando NaNs
+        for col in colunas_renomeadas:
+            if col in df_final.columns:
+                df_final[col] = df_final[col].apply(lambda x: round(x, 4) if pd.notna(x) else x)
+
+        df_formatado = df_final.copy()
+
         def formatar_valor(x):
+            if pd.isna(x):
+                return ""
             try:
-                return f"{x:.4f}" if isinstance(x, float) else int(x)
+                return f"{x:.4f}" if isinstance(x, (float, int)) else int(x)
             except:
                 return x
 
-        df_formatado = df_final.copy()
         for col in colunas_renomeadas:
             if col in df_formatado.columns:
                 df_formatado[col] = df_formatado[col].apply(formatar_valor)
 
-        df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"] = df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"].apply(
-            lambda x: f"{x*100:.0f}%" if pd.notnull(x) and x != "" else ""
-        )
+        def formatar_media_org(x):
+            if pd.isna(x) or x == "":
+                return ""
+            try:
+                return f"{x*100:.2f}%"
+            except:
+                return ""
+
+        df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"] = df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"].apply(formatar_media_org)
 
         def cor_mapa(val):
             if isinstance(val, str) and val.endswith("%"):
-                val_num = int(val.replace("%", ""))
-                if val_num >= 50:
-                    return "background-color: #63be7b"
-                elif val_num >= 25:
-                    return "background-color: #ffeb84"
-                elif val_num > 0:
-                    return "background-color: #f4b084"
-                else:
-                    return "background-color: #e26b5d"
+                try:
+                    val_num = float(val.replace("%", ""))
+                    if val_num >= 50:
+                        return "background-color: #63be7b"
+                    elif val_num >= 25:
+                        return "background-color: #ffeb84"
+                    elif val_num > 0:
+                        return "background-color: #f4b084"
+                    else:
+                        return "background-color: #e26b5d"
+                except:
+                    return ""
             return ""
 
         styled = (
@@ -734,6 +774,7 @@ if uploaded_file:
         )
 
         st.dataframe(styled, use_container_width=True)
+
         # --------- GRÁFICOS DE MÉDIAS POR TECNOLOGIA E TIPO --------------
         grafico_trator = "grafico_trator.png"
         grafico_pulv = "grafico_pulverizador.png"
@@ -776,6 +817,7 @@ if uploaded_file:
                 fig_colh.savefig(grafico_colh, dpi=300, bbox_inches='tight', pad_inches=0.3)
 
         plt.close()
+
 
         # Caminhos e imagens base
         caminho_tabela = "tabela_consolidado.png"
