@@ -639,12 +639,22 @@ if uploaded_file:
             ]
         }
 
+        # Corrigir e padronizar os dados
         df = df.copy()
         df["Tipo_Cat"] = df["Tipo"].map(mapa_tipo_geral)
 
         todas_tecnologias = list(set(sum(colunas_por_tipo.values(), [])))
+
         for col in todas_tecnologias:
+            # 1. Converter para float
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
+            # 2. Tratar valores muito pequenos como zero
+            df[col] = df[col].apply(lambda x: 0.0 if pd.notnull(x) and abs(x) < 0.0001 else x)
+
+    # 3. Garantir que valores NaN não atrapalhem a média
+    # (não preencher com zero — apenas deixar NaN para média correta)
+
 
         # Agrupamento para quantidade de máquinas por Organização e Tipo_Cat
         df_qtd = (
