@@ -760,12 +760,13 @@ if uploaded_file:
                 medias_totais[f"{col}_{tipo}"] = medias_maquina[col].mean()
 
         linha_total = pd.DataFrame([{
-            "Trator": total_maquinas.get("Trator", 0),
-            "Pulverizador": total_maquinas.get("Pulverizador", 0),
-            "Colheitadeira": total_maquinas.get("Colheitadeira", 0),
+            "Trator": int(total_maquinas.get("Trator", 0)),
+            "Pulverizador": int(total_maquinas.get("Pulverizador", 0)),
+            "Colheitadeira": int(total_maquinas.get("Colheitadeira", 0)),
             **medias_totais,
             "MÉDIA POR ORGANIZAÇÃO (%)": np.nan
         }], index=["TOTAL"])
+
 
         df_final = pd.concat([df_final, linha_total])
         # Ajusta exibição: na linha TOTAL, substitui NaN por 0 só para exibir
