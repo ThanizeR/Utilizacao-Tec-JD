@@ -767,8 +767,8 @@ if uploaded_file:
             "MÉDIA POR ORGANIZAÇÃO (%)": np.nan
         }], index=["TOTAL"])
 
-
         df_final = pd.concat([df_final, linha_total])
+
         # Ajusta exibição: na linha TOTAL, substitui NaN por 0 só para exibir
         if "TOTAL" in df_final.index:
             df_final.loc["TOTAL", colunas_renomeadas] = df_final.loc["TOTAL", colunas_renomeadas].fillna(0)
@@ -780,17 +780,20 @@ if uploaded_file:
 
         df_formatado = df_final.copy()
 
-        def formatar_valor(x):
+        def formatar_valor(x, coluna=None):
             if pd.isna(x):
                 return ""
             try:
-                return f"{x:.4f}" if isinstance(x, (float, int)) else int(x)
+                # Se for coluna de máquinas, mostra como inteiro
+                if coluna in ["Trator", "Pulverizador", "Colheitadeira"]:
+                    return str(int(x))
+                # Caso contrário, float com 4 casas decimais
+                return f"{x:.4f}"
             except:
                 return x
 
-        for col in colunas_renomeadas:
-            if col in df_formatado.columns:
-                df_formatado[col] = df_formatado[col].apply(formatar_valor)
+        for col in df_formatado.columns:
+            df_formatado[col] = df_formatado[col].apply(lambda x: formatar_valor(x, coluna=col))
 
         def formatar_media_org(x):
             if pd.isna(x) or x == "":
@@ -801,6 +804,7 @@ if uploaded_file:
                 return ""
 
         df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"] = df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"].apply(formatar_media_org)
+
 
         def cor_mapa(val):
             if isinstance(val, str) and val.endswith("%"):
