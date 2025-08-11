@@ -795,16 +795,22 @@ if uploaded_file:
         for col in df_formatado.columns:
             df_formatado[col] = df_formatado[col].apply(lambda x: formatar_valor(x, coluna=col))
 
-        def formatar_media_org(x):
-            if pd.isna(x) or x == "":
-                return ""
-            try:
-                return f"{x*100:.2f}%"
-            except:
-                return ""
+        def formatar_percentual(x):
+            # Tenta converter para float se for string
+            if isinstance(x, str):
+                x = x.replace("%", "").strip()
+                if x == "":
+                    return ""
+                try:
+                    x = float(x)
+                except:
+                    return ""
+            # Agora x é número ou NaN
+            if pd.notna(x):
+                return f"{x * 100:.2f}%"  # Multiplica por 100 antes de formatar
+            return ""
 
-        df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"] = df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"].apply(formatar_media_org)
-
+        df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"] = df_formatado["MÉDIA POR ORGANIZAÇÃO (%)"].apply(formatar_percentual)
 
         def cor_mapa(val):
             if isinstance(val, str) and val.endswith("%"):
