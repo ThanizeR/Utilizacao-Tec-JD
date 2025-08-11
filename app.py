@@ -956,7 +956,7 @@ if uploaded_file:
                 st.download_button(
                     label="📥 Baixar PDF Consolidado",
                     data=f,
-                    file_name="relatorio_UtilizacaoTecConsolidado.pdf",
+                    file_name=f"relatorio_TecConsolidado_{data_inicio}_a_{data_fim}_{tatica_selecionada}.pdf",
                     mime="application/pdf"
                 )
 
