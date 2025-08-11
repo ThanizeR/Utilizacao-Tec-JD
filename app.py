@@ -410,7 +410,7 @@ st.set_page_config(layout="wide")
 st.title("📊 Geração de Relatório PDF - Máquinas")
 
 # 1. Carregar a planilha de organizações com tática (cache para otimizar)
-@st.cache_data
+@st.cache_data(ttl=0)
 def carregar_organizacoes():
     df_org = pd.read_excel("tabelas/organizacoes_referentes.xlsx")
     # Explode a coluna Tática para ter uma linha por tática
