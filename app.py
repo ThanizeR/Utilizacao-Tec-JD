@@ -655,7 +655,7 @@ if uploaded_file:
         def mapear_tipo(tipo_original):
             if pd.isna(tipo_original):
                 return None
-            if "Tratores Com Tração Em Duas Rodas" in tipo_original:
+            if "Trator" in tipo_original:
                 return "Trator"
             elif "Colheitadeira" in tipo_original:
                 return "Colheitadeira"
