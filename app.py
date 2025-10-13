@@ -165,7 +165,7 @@ def salvar_tabela_com_matplotlib(df, caminho_imagem, organizacao, data_inicio, d
     import matplotlib.colors as mcolors
 
     num_linhas = len(df)
-    altura_por_linha = 0.16
+    altura_por_linha = 0.25
     altura_total = min(7.2, num_linhas * altura_por_linha)
 
     fig, ax = plt.subplots(figsize=(12.5, altura_total))  # mais espaço horizontal
@@ -194,7 +194,7 @@ def salvar_tabela_com_matplotlib(df, caminho_imagem, organizacao, data_inicio, d
         colLabels=col_labels,
         cellLoc='center',
         colWidths=colWidths,
-        bbox=[0, -0.18, 1, 1]  # posição vertical ideal
+        bbox=[0, -0.90, 1, 1]  # posição vertical ideal
     )
 
     tabela.auto_set_font_size(False)
