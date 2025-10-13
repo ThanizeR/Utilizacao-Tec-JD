@@ -198,7 +198,7 @@ def salvar_tabela_com_matplotlib(df, caminho_imagem, organizacao, data_inicio, d
     )
 
     tabela.auto_set_font_size(False)
-    tabela.set_fontsize(7.0)
+    tabela.set_fontsize(5.5)
     tabela.scale(1.0, 0.9)  # mais seguro para evitar espremimento horizontal
 
     media_col_index = df.columns.get_loc("Média (%)")
@@ -471,7 +471,8 @@ if uploaded_file:
         "Trator": [
             "AutoTrac™ Ativo (%)",
             "FieldCruise™ Ligado (%)",
-            "Tempo Ligado do Efficiency Manager™ Automático (%)"
+            "Tempo Ligado do Efficiency Manager™ Automático (%)",
+            "Automação de Curva do AutoTrac™ Ativo (%)"
         ],
         "Pulverizador": [
             "Pulsante Ativo (%)",
@@ -492,6 +493,8 @@ if uploaded_file:
         tipo_selecionado = st.sidebar.selectbox("Selecione o Tipo de Equipamento", list(colunas_por_tipo.keys()))
         tipo_selecionado_normalizado = tipo_selecionado.lower()
         df_filtrado = df[df["Tipo Normalizado"].str.contains(tipo_selecionado_normalizado, na=False)]
+        ##st.write("Colunas do df_filtrado:", df_filtrado.columns.tolist())
+
 
         if df_filtrado.empty:
             st.warning("Nenhum dado encontrado para esse tipo.")
@@ -589,7 +592,7 @@ if uploaded_file:
                 graficos_paths = []
                 
                 # Gráficos verticais de média por modelo (máximo 3)
-                for i, col in enumerate(colunas[:3]):
+                for i, col in enumerate(colunas[:4]):
                     fig, ax = plt.subplots(figsize=(6, 4))
                     df_modelo[col].plot(kind='bar', ax=ax, color='yellow', width=0.7)
                     ax.set_ylim(0, 100)
@@ -603,25 +606,6 @@ if uploaded_file:
                     path = os.path.join(tmpdir, f"grafico_{i}.png")
                     salvar_grafico(fig, path)
                     graficos_paths.append(path)
-
-                # Gráfico horizontal verde: Média geral por máquina
-                df_media_maquina = df_resultado[["Máquina", "Média (%)"]].copy()
-                df_media_maquina["Média (%)"] = df_media_maquina["Média (%)"].astype(float)
-                df_media_maquina = df_media_maquina.sort_values(by="Média (%)", ascending=True).set_index("Máquina")
-
-                fig, ax = plt.subplots(figsize=(10, 6))
-                df_media_maquina["Média (%)"].plot(kind='barh', color='green', ax=ax)
-                ax.set_xlim(0, 100)
-                ax.set_xlabel("Média (%)")
-                ax.set_title(f"Média Geral das Tecnologias por Máquina - {tipo_selecionado}")
-                ax.grid(axis='x', linestyle='--', alpha=0.7)
-
-                for i, value in enumerate(df_media_maquina["Média (%)"]):
-                    ax.text(value + 1, i, f'{value:.2f}%', va='center', fontsize=9)
-
-                path_horizontal = os.path.join(tmpdir, "grafico_horizontal.png")
-                salvar_grafico(fig, path_horizontal)
-                graficos_paths.append(path_horizontal)
 
                 # PDF
                 fundo_capa = "capa_fundo.png"
