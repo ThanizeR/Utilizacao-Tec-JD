@@ -146,7 +146,9 @@ def gerar_pdf_completo(caminho_tabela, graficos_paths, capa_fundo, fundo_paginas
 
     # Página 2: Tabela centralizada e sem título
     pdf.add_page()
-    pdf.image(caminho_tabela, x=10, y=12, w=pdf.w - 20)
+    pdf.set_y(20)
+    pdf.image(caminho_tabela, x=10, y=pdf.get_y(), w=pdf.w - 20)
+
 
     # Página 3: Gráficos até 4 imagens em layout 2x2
     if graficos_paths:
@@ -194,7 +196,7 @@ def salvar_tabela_com_matplotlib(df, caminho_imagem, organizacao, data_inicio, d
         colLabels=col_labels,
         cellLoc='center',
         colWidths=colWidths,
-        bbox=[0, -0.90, 1, 1]  # posição vertical ideal
+        bbox=[0, 0, 1, 1] # posição vertical ideal
     )
 
     tabela.auto_set_font_size(False)
